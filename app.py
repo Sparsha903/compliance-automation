@@ -1,28 +1,58 @@
 import os
-import io
+from io import BytesIO
 
-from flask import Flask, render_template, request, redirect, url_for, flash
-from b2sdk.v2 import InMemoryAccountInfo, B2Api
+from flask import Flask, render_template, request
 from PyPDF2 import PdfReader
 
-# ----- Flask setup -----
-app = Flask(__name__)
-app.secret_key = "some-secret-key"  # just for flash messages
+from b2sdk.v2 import InMemoryAccountInfo, B2Api
 
-# ----- Backblaze B2 setup -----
+app = Flask(__name__)
+
+# ---------- Backblaze B2 SETUP ----------
+
 B2_KEY_ID = os.getenv("B2_KEY_ID")
 B2_APP_KEY = os.getenv("B2_APP_KEY")
-B2_BUCKET_NAME = os.getenv("B2_BUCKET")
+B2_BUCKET = os.getenv("B2_BUCKET")  # should be "compliance-checker"
 
-info = InMemoryAccountInfo()
-b2_api = B2Api(info)
-
-# authorize with Backblaze using environment vars
-b2_api.authorize_account("production", B2_KEY_ID, B2_APP_KEY)
-bucket = b2_api.get_bucket_by_name(B2_BUCKET_NAME)
+b2_api = None
+b2_bucket = None
 
 
-# ----- Simple rule-based compliance engine -----
+def init_b2():
+    """
+    Lazily initialize Backblaze so the app doesn't crash
+    if keys are missing while you're still setting things up.
+    """
+    global b2_api, b2_bucket
+    if not (B2_KEY_ID and B2_APP_KEY and B2_BUCKET):
+        return None, None  # running without cloud until keys are set
+
+    if b2_api is None:
+        info = InMemoryAccountInfo()
+        b2_api = B2Api(info)
+        b2_api.authorize_account("production", B2_KEY_ID, B2_APP_KEY)
+        b2_bucket = b2_api.get_bucket_by_name(B2_BUCKET)
+
+    return b2_api, b2_bucket
+
+
+def upload_to_b2(filename: str, data: bytes):
+    """
+    Uploads file bytes to Backblaze B2 and returns a public-ish URL.
+    (Bucket can be private; URL is just for your report / testing.)
+    """
+    _, bucket = init_b2()
+    if bucket is None:
+        # No keys configured – just skip upload for now
+        return None
+
+    bucket.upload_bytes(data, filename)
+    # Standard B2 download URL form (for simple demo use)
+    return f"https://f000.backblazeb2.com/file/{B2_BUCKET}/{filename}"
+
+
+# ---------- SIMPLE COMPLIANCE CHECKER ----------
+
 GDPR_RULES = [
     "consent",
     "data retention",
@@ -32,8 +62,8 @@ GDPR_RULES = [
 ]
 
 HIPAA_RULES = [
-    "protected health information",
     "PHI",
+    "protected health information",
     "breach notification",
     "encryption",
     "access control",
@@ -42,84 +72,75 @@ HIPAA_RULES = [
 
 def check_compliance(text: str):
     rules = GDPR_RULES + HIPAA_RULES
-    passed = []
+    found = []
     missing = []
 
     lower_text = text.lower()
-
     for rule in rules:
         if rule.lower() in lower_text:
-            passed.append(rule)
+            found.append(rule)
         else:
             missing.append(rule)
 
-    score = round(len(passed) / len(rules) * 100, 2)
-    return score, passed, missing
+    score = round(len(found) / len(rules) * 100, 2)
+    return score, found, missing
 
 
-def extract_text_from_file(filename: str, data: bytes) -> str:
-    if filename.lower().endswith(".pdf"):
-        reader = PdfReader(io.BytesIO(data))
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text() or ""
-            text += page_text + "\n"
-        return text
-    else:
-        # treat as plain text file
-        return data.decode("utf-8", errors="ignore")
+def extract_text_from_pdf(file_bytes: bytes) -> str:
+    pdf = PdfReader(BytesIO(file_bytes))
+    pages_text = []
+    for page in pdf.pages:
+        try:
+            pages_text.append(page.extract_text() or "")
+        except Exception:
+            continue
+    return "\n".join(pages_text)
 
 
-# ----- Routes -----
+# ---------- ROUTES ----------
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html")
+    # First load – no result
+    return render_template("index.html", result=None)
 
 
 @app.route("/upload", methods=["POST"])
 def upload():
     if "file" not in request.files:
-        flash("No file part")
-        return redirect(url_for("index"))
+        return render_template("index.html", error="No file uploaded", result=None)
 
-    file = request.files["file"]
+    f = request.files["file"]
+    if f.filename == "":
+        return render_template("index.html", error="No file selected", result=None)
 
-    if file.filename == "":
-        flash("No selected file")
-        return redirect(url_for("index"))
+    data = f.read()
 
-    file_bytes = file.read()
-    filename = file.filename
+    # Upload original file to Backblaze
+    b2_url = upload_to_b2(f.filename, data)
 
-    # 1) Upload original file to Backblaze
-    bucket.upload_bytes(file_bytes, filename)
+    # Extract text (PDF or TXT)
+    content_type = f.content_type or ""
+    if f.filename.lower().endswith(".pdf") or "pdf" in content_type:
+        text = extract_text_from_pdf(data)
+    else:
+        # assume text file
+        text = data.decode(errors="ignore")
 
-    # 2) Extract text and run compliance check
-    text = extract_text_from_file(filename, file_bytes)
-    score, passed, missing = check_compliance(text)
+    score, found, missing = check_compliance(text)
 
-    # 3) Create a simple text report and upload it
-    report_content = (
-        f"Compliance Report for {filename}\n"
-        f"Score: {score}%\n\n"
-        f"Passed rules:\n- " + "\n- ".join(passed) +
-        "\n\nMissing rules:\n- " + ("\n- ".join(missing) if missing else "None")
-    )
-    report_name = filename + "_report.txt"
-    bucket.upload_bytes(report_content.encode("utf-8"), report_name)
+    result = {
+        "filename": f.filename,
+        "score": score,
+        "found": found,
+        "missing": missing,
+        "b2_url": b2_url,
+    }
 
-    # Render result page
-    return render_template(
-        "result.html",
-        filename=filename,
-        score=score,
-        passed=passed,
-        missing=missing,
-        report_name=report_name,
-    )
+    return render_template("index.html", result=result, error=None)
 
 
-# For Render with gunicorn: entry point "app:app"
+# For Render: 'gunicorn app:app' looks for this
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
+
