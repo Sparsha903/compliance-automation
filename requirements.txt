@@ -1,4 +1,4 @@
 flask
+gunicorn
 b2sdk
 PyPDF2
-gunicorn
