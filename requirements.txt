@@ -1,0 +1,4 @@
+flask
+b2sdk
+PyPDF2
+gunicorn
