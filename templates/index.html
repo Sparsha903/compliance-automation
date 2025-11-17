@@ -1,24 +1,62 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Compliance Checker</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
-        h1 { text-align: center; }
-        form { margin-top: 30px; }
-        input[type="file"] { margin-bottom: 20px; }
-        button { padding: 8px 16px; cursor: pointer; }
-    </style>
+  <meta charset="utf-8">
+  <title>Compliance Automation – GDPR & HIPAA</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; }
+    h1 { text-align: center; }
+    .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
+    .error { color: red; margin-bottom: 10px; }
+    .score { font-size: 1.2rem; font-weight: bold; }
+    ul { line-height: 1.6; }
+  </style>
 </head>
 <body>
-    <h1>GDPR & HIPAA Compliance Checker</h1>
-    <p>Upload a PDF or text file. The system will check for basic GDPR and HIPAA compliance keywords.</p>
+  <h1>Compliance Automation (GDPR &amp; HIPAA)</h1>
+
+  <div class="card">
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
 
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" required />
-        <br/>
-        <button type="submit">Upload &amp; Check</button>
+      <label>Select a PDF or TXT document:</label><br><br>
+      <input type="file" name="file" accept=".pdf,.txt" required>
+      <br><br>
+      <button type="submit">Upload &amp; Check Compliance</button>
     </form>
+  </div>
+
+  {% if result %}
+    <br>
+    <div class="card">
+      <div class="score">
+        File: <strong>{{ result.filename }}</strong><br>
+        Compliance Score: <strong>{{ result.score }}%</strong>
+      </div>
+
+      {% if result.b2_url %}
+        <p>Stored in Backblaze B2 at (demo link):<br>
+          <code>{{ result.b2_url }}</code>
+        </p>
+      {% endif %}
+
+      <h3>Rules Found</h3>
+      <ul>
+        {% for r in result.found %}
+          <li>{{ r }}</li>
+        {% endfor %}
+      </ul>
+
+      <h3>Missing / Not Detected</h3>
+      <ul>
+        {% for r in result.missing %}
+          <li>{{ r }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 </body>
 </html>
