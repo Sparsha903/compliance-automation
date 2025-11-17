@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Compliance Checker</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+        h1 { text-align: center; }
+        form { margin-top: 30px; }
+        input[type="file"] { margin-bottom: 20px; }
+        button { padding: 8px 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>GDPR & HIPAA Compliance Checker</h1>
+    <p>Upload a PDF or text file. The system will check for basic GDPR and HIPAA compliance keywords.</p>
+
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required />
+        <br/>
+        <button type="submit">Upload &amp; Check</button>
+    </form>
+</body>
+</html>
