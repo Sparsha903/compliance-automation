@@ -1,62 +1,177 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Compliance Automation – GDPR & HIPAA</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; }
-    h1 { text-align: center; }
-    .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
-    .error { color: red; margin-bottom: 10px; }
-    .score { font-size: 1.2rem; font-weight: bold; }
-    ul { line-height: 1.6; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Compliance Automation (GDPR & HIPAA)</title>
+
+    <!-- Bootstrap (for easy styling) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            min-height: 100vh;
+            background: radial-gradient(circle at top left, #1e293b, #020617);
+            color: #e5e7eb;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .page-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+        .app-card {
+            max-width: 900px;
+            width: 100%;
+            border-radius: 1.25rem;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.7);
+            background: linear-gradient(145deg, #020617, #020617f2);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .app-title {
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .badge-pill {
+            border-radius: 999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        .upload-area {
+            border: 1px dashed rgba(148, 163, 184, 0.7);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .btn-upload {
+            border-radius: 999px;
+            padding-inline: 1.5rem;
+            font-weight: 600;
+        }
+        .rules-column h5 {
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+        }
+        .rules-column ul {
+            font-size: 0.95rem;
+        }
+        .score-badge {
+            border-radius: 999px;
+            padding: 0.35rem 0.9rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .score-good {
+            background: rgba(22, 163, 74, 0.18);
+            color: #4ade80;
+        }
+        .score-medium {
+            background: rgba(234, 179, 8, 0.18);
+            color: #facc15;
+        }
+        .score-bad {
+            background: rgba(220, 38, 38, 0.18);
+            color: #fca5a5;
+        }
+        .file-name {
+            font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.9rem;
+            color: #cbd5f5;
+        }
+    </style>
 </head>
 <body>
-  <h1>Compliance Automation (GDPR &amp; HIPAA)</h1>
+<div class="page-wrapper">
+    <div class="app-card p-4 p-md-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="app-title h3 mb-1 text-white">
+                    Compliance Automation <span class="text-info">(GDPR &amp; HIPAA)</span>
+                </h1>
+                <p class="mb-0 text-secondary small">
+                    Upload a policy / consent / document and get an instant compliance score.
+                </p>
+            </div>
+            <span class="badge bg-info-subtle text-info-emphasis badge-pill mt-3 mt-md-0">
+                Cloud + Backblaze B2
+            </span>
+        </div>
 
-  <div class="card">
-    {% if error %}
-      <div class="error">{{ error }}</div>
-    {% endif %}
+        <!-- Upload Form -->
+        <div class="upload-area mb-4">
+            <form action="/upload" method="post" enctype="multipart/form-data" class="row g-3 align-items-center">
+                <div class="col-12 col-md-7">
+                    <label class="form-label mb-1 small text-uppercase text-secondary">
+                        Select a PDF or TXT document
+                    </label>
+                    <input class="form-control form-control-sm" type="file" name="file" required>
+                </div>
+                <div class="col-12 col-md-5 d-flex align-items-end justify-content-md-end">
+                    <button type="submit" class="btn btn-primary btn-upload w-100 w-md-auto">
+                        Upload &amp; Check Compliance
+                    </button>
+                </div>
+            </form>
+        </div>
 
-    <form action="/upload" method="post" enctype="multipart/form-data">
-      <label>Select a PDF or TXT document:</label><br><br>
-      <input type="file" name="file" accept=".pdf,.txt" required>
-      <br><br>
-      <button type="submit">Upload &amp; Check Compliance</button>
-    </form>
-  </div>
+        <!-- Results -->
+        {% if score is not none %}
+        {% set score_class = 'score-good' %}
+        {% if score < 40 %}
+            {% set score_class = 'score-bad' %}
+        {% elif score < 70 %}
+            {% set score_class = 'score-medium' %}
+        {% endif %}
 
-  {% if result %}
-    <br>
-    <div class="card">
-      <div class="score">
-        File: <strong>{{ result.filename }}</strong><br>
-        Compliance Score: <strong>{{ result.score }}%</strong>
-      </div>
+        <div class="border-top border-secondary pt-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+                <div>
+                    <p class="mb-1 text-secondary small text-uppercase">Analysis Result</p>
+                    <p class="file-name mb-0">
+                        File: {{ file_name }}
+                    </p>
+                </div>
+                <div class="text-md-end mt-3 mt-md-0">
+                    <span class="text-secondary small d-block">Compliance Score</span>
+                    <span class="score-badge {{ score_class }}">
+                        {{ '%.1f'|format(score) }}%
+                    </span>
+                </div>
+            </div>
 
-      {% if result.b2_url %}
-        <p>Stored in Backblaze B2 at (demo link):<br>
-          <code>{{ result.b2_url }}</code>
-        </p>
-      {% endif %}
-
-      <h3>Rules Found</h3>
-      <ul>
-        {% for r in result.found %}
-          <li>{{ r }}</li>
-        {% endfor %}
-      </ul>
-
-      <h3>Missing / Not Detected</h3>
-      <ul>
-        {% for r in result.missing %}
-          <li>{{ r }}</li>
-        {% endfor %}
-      </ul>
+            <div class="row g-4">
+                <div class="col-md-6 rules-column">
+                    <h5 class="mb-2">Rules Found</h5>
+                    {% if found_rules %}
+                        <ul class="list-unstyled mb-0">
+                            {% for r in found_rules %}
+                                <li class="mb-1">• {{ r }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-secondary small mb-0">No compliance keywords detected.</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 rules-column">
+                    <h5 class="mb-2">Missing / Not Detected</h5>
+                    {% if missing_rules %}
+                        <ul class="list-unstyled mb-0">
+                            {% for r in missing_rules %}
+                                <li class="mb-1">• {{ r }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-secondary small mb-0">Great! No missing rules detected.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
-  {% endif %}
+</div>
+
 </body>
 </html>
