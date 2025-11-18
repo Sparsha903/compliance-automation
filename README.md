@@ -31,5 +31,5 @@ A cloud-based mini-project using **Flask**, **Render**, and **Backblaze B2** to 
 
 ---
 
-## 📁 Project Structure
+
 
