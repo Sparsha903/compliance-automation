@@ -4,8 +4,7 @@
 ![Flask](https://img.shields.io/badge/Flask-Framework-black?logo=flask)
 ![Render](https://img.shields.io/badge/Render-Deployed-46E3B7?logo=render)
 ![Backblaze](https://img.shields.io/badge/Backblaze-B2%20Storage-red?logo=backblaze)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+
 
 A cloud-based mini-project using **Flask**, **Render**, and **Backblaze B2** to analyze PDF/TXT documents for basic GDPR and HIPAA compliance.
 
